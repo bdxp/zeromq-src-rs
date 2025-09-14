@@ -210,6 +210,18 @@ impl Build {
     pub fn build(&mut self) {
         let vendor = Path::new(env!("CARGO_MANIFEST_DIR")).join("vendor");
 
+        let target_cpu = std::env::var("CARGO_ENCODED_RUSTFLAGS")
+            .ok()
+            .and_then(|flags| {
+                let pattern = "target-cpu=";
+                let idx: Vec<_> = flags.match_indices(pattern).collect();
+                if idx.len() == 1 {
+                    let end_idx = idx[0].0 + pattern.len();
+                    return Some(flags[end_idx..].to_owned());
+                }
+                None
+            });
+
         let mut build = cc::Build::new();
         build
             // We use c++ as the default.
@@ -222,6 +234,10 @@ impl Build {
             .define("ZMQ_BUILD_TESTS", "OFF")
             .include(vendor.join("include"))
             .include(vendor.join("src"));
+
+        if target_cpu.is_some() {
+            build.flag(format!("-march={}", target_cpu.unwrap()));
+        }
 
         println!("cargo:rerun-if-changed={}", vendor.join("src").display());
 
